@@ -1,0 +1,39 @@
+- name: Chaos Experiment - Pod Kill
+  hosts: localhost
+  gather_facts: false
+
+  tasks:
+    - name: Get a running pod name
+      command: kubectl get pods -l app=chaos-target --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}'
+      register: pod_name
+
+    - name: Record start time
+      command: date +%s
+      register: start_time
+
+    - name: Print which pod we are killing
+      debug:
+        msg: "Killing pod: {{ pod_name.stdout }}"
+
+    - name: Kill the pod
+      command: kubectl delete pod {{ pod_name.stdout }}
+
+    - name: Wait 20 seconds for recovery
+      pause:
+        seconds: 20
+
+    - name: Check recovered pods
+      command: kubectl get pods -l app=chaos-target
+      register: pod_status
+
+    - name: Record end time
+      command: date +%s
+      register: end_time
+
+    - name: Show pod status after chaos
+      debug:
+        msg: "{{ pod_status.stdout }}"
+
+    - name: Show resilience result
+      debug:
+        msg: "System recovered in {{ end_time.stdout|int - start_time.stdout|int }} seconds | Resilience score: {{ 100 - ((end_time.stdout|int - start_time.stdout|int) * 2) }}/100"
